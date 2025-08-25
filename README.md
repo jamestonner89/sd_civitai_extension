@@ -49,6 +49,16 @@ The Civitai Link Key is a short 6 character token that you'll receive when setti
 
 Since Civitai Link is still in alpha, it is currently only available to Supporters as part of the Civitai Early Access program. You can get access to Civitai Link today by [becoming a supporter](https://civitai.com/pricing) 🥰 or you can wait until we've gotten it to a state that we're ready for a full release.
 
+## Archiving Web App
+
+A small FastAPI application is provided to preserve model metadata and preview images. Install the dependencies and start the server:
+
+```sh
+python scripts/archive_webapp.py
+```
+
+Use `GET /archive/{model_id}` to download metadata and images into `archive_data` and `GET /models` to list archived entries.
+
 ## Contribute
 
 Hop into the development channel in our [Discord server](https://discord.gg/UwX5wKwm6c) and let's chat!

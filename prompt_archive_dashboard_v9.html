@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Archive Dashboard v9</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/phosphor-icons"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+        }
+        .tag, .tag-sm {
+            background-color: #374151; /* bg-gray-700 */
+            color: #D1D5DB; /* text-gray-300 */
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .tag-sm {
+            padding: 1px 6px;
+            font-size: 0.65rem;
+        }
+        .tag-filter-btn {
+            background-color: #374151;
+            color: #D1D5DB;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .tag-filter-btn:hover { background-color: #4B5563; }
+        .tag-filter-btn.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #6366f1;
+        }
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            align-items: center;
+        }
+        .metadata-grid dt { color: #9CA3AF; font-weight: 500; }
+        .metadata-grid dd {
+            color: #F3F4F6;
+            background-color: #1F2937;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1F2937; }
+        ::-webkit-scrollbar-thumb { background: #4B5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6B7280; }
+        .folder-item {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+        .folder-item:hover { background-color: #374151; }
+        .folder-item.active { background-color: #4f46e5; color: white; }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: #1f2937; /* bg-gray-800 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .form-input {
+            background-color: #374151;
+            border: 1px solid #4B5563;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            width: 100%;
+            color: #F3F4F6;
+        }
+        .form-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #4f46e5;
+        }
+        .custom-message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 500;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+        }
+        .custom-message-box.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(10px);
+        }
+        .custom-message-box.success { background-color: #16a34a; }
+        .custom-message-box.error { background-color: #dc2626; }
+        
+        /* Full-page view styles */
+        .full-page-view {
+            position: fixed;
+            inset: 0;
+            background-color: #111827;
+            z-index: 60;
+            display: none; /* Hidden by default */
+        }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <div id="app-container" class="flex flex-col md:flex-row min-h-screen">
+        <!-- Control Panel -->
+        <aside class="w-full md:w-1/3 lg:w-1/4 p-6 bg-gray-900 border-r border-gray-700 flex flex-col space-y-6">
+            <header class="flex items-center space-x-3">
+                <i class="ph-bold ph-stack text-3xl text-indigo-400"></i>
+                <h1 class="text-2xl font-bold text-white">Prompt Archive</h1>
+            </header>
+
+            <!-- Actions Section -->
+            <div class="space-y-3">
+                 <button id="open-add-image-modal-btn" class="w-full bg-indigo-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-indigo-700 transition flex items-center justify-center space-x-2">
+                    <i class="ph ph-plus-circle"></i>
+                    <span>Add New Image</span>
+                </button>
+                 <button id="open-model-manager-btn" class="w-full bg-gray-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-gray-700 transition flex items-center justify-center space-x-2">
+                    <i class="ph ph-cube"></i>
+                    <span>Model Manager</span>
+                </button>
+            </div>
+
+            <!-- Collection Section -->
+            <div class="space-y-4 flex-grow flex flex-col min-h-0">
+                <h2 class="text-lg font-semibold text-gray-300 border-b border-gray-700 pb-2">My Collection</h2>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="new-folder-name" placeholder="New folder name..." class="flex-grow bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                    <button id="add-folder-btn" class="bg-gray-600 text-white font-semibold rounded-lg p-2 hover:bg-gray-700 transition"><i class="ph ph-folder-plus"></i></button>
+                </div>
+                <div id="folder-browser" class="flex-grow overflow-y-auto pr-2 space-y-1">
+                    <!-- Folder structure will be rendered here -->
+                </div>
+            </div>
+            
+            <footer class="text-xs text-gray-500 text-center pt-4 border-t border-gray-700">
+                <p>JayEye | Stable Diffusion Tools</p>
+                <p>&copy; 2024. All rights reserved.</p>
+            </footer>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="w-full md:w-2/3 lg:w-3/4 p-6 overflow-y-auto" style="max-height: 100vh;">
+            <div id="main-view">
+                 <!-- Gallery Header -->
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <nav id="breadcrumbs" class="flex items-center text-sm text-gray-400"></nav>
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="search-input" placeholder="Search in folder..." class="w-full bg-gray-800 border border-gray-600 rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                        </div>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="show-hidden-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            <span class="ml-3 text-sm font-medium text-gray-300">Show Hidden</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Gallery view -->
+                <div id="gallery-view">
+                    <div id="tag-filter-container" class="flex flex-wrap items-center gap-2 mb-4 border-b border-gray-700 pb-4">
+                        <!-- Tag filters will be rendered here -->
+                    </div>
+                    <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <!-- Placeholder -->
+                        <div id="placeholder-card" class="text-center text-gray-500 col-span-full border-2 border-dashed border-gray-700 rounded-lg p-12 flex flex-col items-center justify-center">
+                            <i class="ph-light ph-images text-6xl mb-4"></i>
+                            <h3 class="text-xl font-semibold">This Folder is Empty</h3>
+                            <p>Click 'Add New Image' to get started.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals Container -->
+    <div id="modal-container"></div>
+    <div id="message-box-container"></div>
+    <div id="model-manager-view" class="full-page-view"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM ELEMENTS ---
+            const openAddImageModalBtn = document.getElementById('open-add-image-modal-btn');
+            const openModelManagerBtn = document.getElementById('open-model-manager-btn');
+            const searchInput = document.getElementById('search-input');
+            const showHiddenToggle = document.getElementById('show-hidden-toggle');
+            const addFolderBtn = document.getElementById('add-folder-btn');
+            const newFolderNameInput = document.getElementById('new-folder-name');
+            
+            const galleryGrid = document.getElementById('gallery-grid');
+            const placeholderCard = document.getElementById('placeholder-card');
+            const folderBrowser = document.getElementById('folder-browser');
+            const breadcrumbs = document.getElementById('breadcrumbs');
+            const tagFilterContainer = document.getElementById('tag-filter-container');
+            const modalContainer = document.getElementById('modal-container');
+            const messageBoxContainer = document.getElementById('message-box-container');
+            const modelManagerView = document.getElementById('model-manager-view');
+
+            // --- STATE & CONSTANTS ---
+            let fileSystem = { id: 'root', name: 'My Collection', type: 'folder', children: [] };
+            let models = [];
+            let creators = [];
+            let currentFolderId = 'root';
+            let nextId = 100;
+            let activeTagFilters = new Set();
+            
+            const MODEL_TYPES = ['Checkpoint', 'TextualInversion', 'Hypernetwork', 'AestheticGradient', 'LORA', 'LoCon', 'DoRA', 'Controlnet', 'Upscaler', 'MotionModule', 'VAE', 'Poses', 'Wildcards', 'Workflows', 'Other'];
+            const BASE_MODELS = ['SD 1.4', 'SD 1.5', 'SD 2.0', 'SD 2.1', 'SDXL 1.0', 'Pony', 'SD 3', 'Flux', 'Other'];
+
+
+            // --- MOCK DATA ---
+            function initializeMockData() {
+                 creators = [
+                    { id: 'c-1', name: 'cyberrealistic', url: 'https://civitai.com/user/cyberrealistic', profileImageUrl: 'https://placehold.co/100x100/4f46e5/ffffff?text=CR', about: 'Specializes in photorealistic models.', stats: {followers: 15300, likes: 86100, downloads: 1600000}, socialLinks: [{name: 'patreon', url: 'https://patreon.com/cyberdelia'}] },
+                    { id: 'c-2', name: 'Lykon', url: 'https://civitai.com/user/Lykon', profileImageUrl: 'https://placehold.co/100x100/16a34a/ffffff?text=L', about: 'Creator of DreamShaper series.', stats: {followers: 20000, likes: 100000, downloads: 2000000}, socialLinks: [] },
+                ];
+
+                models = [
+                    { 
+                        id: 'model-1', name: 'CyberRealistic', type: 'Checkpoint', creatorId: 'c-1', url: 'https://civitai.com/models/15003', description: 'A model focused on creating realistic and cyber-punk themed images.', tags: ['photorealistic', 'character', 'female'], galleryImageIds: ['item-101'],
+                        versions: [
+                            { id: 'mv-1', name: 'v4.1', baseModel: 'SD 1.5', publishedDate: '2023-11-01', description: 'Initial stable release.', trainedWords: ['cyberrealistic'], hashes: { SHA256: 'D7E44A166425A6342B67525641B66838A6FBFB22A305A83944C44722F51AD957' }, downloadLinks: [{url: 'https://civitai.com/api/download/models/133608', name: 'cyberrealistic_v41.safetensors'}] }
+                        ]
+                    },
+                    { 
+                        id: 'model-2', name: 'DreamShaper', type: 'Checkpoint', creatorId: 'c-2', url: 'https://civitai.com/models/4384', description: 'A versatile model for various styles, from anime to general art.', tags: ['general purpose', 'style', 'anime'], galleryImageIds: [],
+                        versions: [
+                            { id: 'mv-2', name: '8', baseModel: 'SD 1.5', publishedDate: '2023-08-15', description: 'Major update with improved coherence.', trainedWords: [], hashes: { SHA256: '8F2A2E6235F5310CAF2B22C0C9365ADD8816A221858840E8168A56B142517C01' }, downloadLinks: [] },
+                            { id: 'mv-3', name: 'XL1.0', baseModel: 'SDXL 1.0', publishedDate: '2024-01-20', description: 'First version for SDXL.', trainedWords: [], hashes: { SHA256: '12E34C5678F9012A3456B789C012D345E678F901A234B567C890D123E456F789' }, downloadLinks: [] }
+                        ]
+                    },
+                    {
+                        id: 'model-3', name: 'CyberRealistic_Flux', type: 'Checkpoint', creatorId: 'c-1', url: '', description: 'Next-generation photorealistic model based on the Flux architecture.', tags: ['photorealistic', 'realism', 'female'], galleryImageIds: ['item-102'],
+                        versions: [
+                            { id: 'mv-4', name: 'V2.1_FP16', baseModel: 'Flux', publishedDate: '2024-05-10', description: 'Optimized FP16 version.', trainedWords: [], hashes: { SHA256: 'FDC4B922238421869E12345B6789C012D345E678F901A234B567C890D123EABC', AUTOV2: '1A2B3C4D5E6F7890', BLAKE3: 'FEDCBA9876543210' }, downloadLinks: [] }
+                        ]
+                    }
+                ];
+
+                fileSystem.children.push({
+                    id: `item-101`, type: 'image', visibility: 'public',
+                    imageUrl: "https://placehold.co/600x800/7c3aed/ffffff?text=Cyberpunk+City",
+                    creator: 'User123', sourceUrl: 'https://civitai.com/images/1', reactions: {like: 1200, love: 500, laugh: 50},
+                    meta: {
+                        prompt: "masterpiece, best quality, 1girl, solo, long hair, cyberpunk city, neon lights, intricate details, reflective surfaces, rain, cinematic lighting, futuristic outfit",
+                        negativePrompt: "low quality, worst quality, blurry, ugly, deformed, text, watermark, signature",
+                        modelVersionId: 'mv-1', steps: 30, sampler: "DPM++ 2M Karras", cfgScale: 7, seed: 1234567890,
+                    },
+                    tags: ["cyberpunk", "sci-fi", "1girl", "cityscape", "neon"]
+                });
+
+                fileSystem.children.push({
+                    id: `item-102`, type: 'image', visibility: 'public',
+                    imageUrl: "https://placehold.co/896x1152/374151/ffffff?text=Soulful+Blonde",
+                    creator: 'Unknown', sourceUrl: '', reactions: {like: 2500, love: 1200, laugh: 300, cry: 100},
+                    meta: {
+                        prompt: "young woman with a smooth youthful face, upper body captured as she stares directly at the viewer with soulful reflective blue eyes and a small relaxed grin, blonde hair tucked behind her ears and falling naturally over her shoulders, soft cinematic studio lighting casting gentle highlights along her cheeks and nose, warm natural tones enhancing skin realism, with controlled film grain subtly adding depth and texture in a neutral-toned studio background",
+                        negativePrompt: "worst quality, low quality, blurry, deformed, watermark",
+                        modelVersionId: 'mv-4', 
+                        steps: 30, sampler: "DPM++ 2M", cfgScale: 1, seed: "770245612",
+                        hires: { upscale: 1.5, upscaler: '4x_NickelbackFS_72000_G', denoising: 0.35 }
+                    },
+                    tags: ["young woman", "blonde hair", "blue eyes", "cinematic lighting", "studio background", "photorealistic"]
+                });
+            }
+
+            // --- UTILITY FUNCTIONS ---
+            function showMessage(text, type = 'success') {
+                const box = document.createElement('div');
+                box.className = `custom-message-box ${type}`;
+                box.textContent = text;
+                messageBoxContainer.appendChild(box);
+                setTimeout(() => {
+                    box.classList.add('show');
+                }, 10);
+                setTimeout(() => {
+                    box.classList.remove('show');
+                    box.addEventListener('transitionend', () => box.remove());
+                }, 3000);
+            }
+            
+            function formatNumber(num) {
+                if (num >= 1000000) return (num / 1000000).toFixed(1) + 'm';
+                if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+                return num.toString();
+            }
+
+            // --- CORE FUNCTIONS ---
+            function findItemAndParent(itemId, startNode = fileSystem) {
+                if (startNode.id === itemId) return { item: startNode, parent: null };
+                if (!startNode.children) return null;
+                for (const child of startNode.children) {
+                    if (child.id === itemId) return { item: child, parent: startNode };
+                    if (child.type === 'folder') {
+                        const found = findItemAndParent(itemId, child);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            }
+            
+            function findModelAndVersion(modelVersionId) {
+                for (const model of models) {
+                    const version = model.versions.find(v => v.id === modelVersionId);
+                    if (version) return { model, version };
+                }
+                return { model: null, version: null };
+            }
+
+            function renderFolderBrowser(node = fileSystem, level = 0) {
+                const element = document.createElement('div');
+                element.className = 'folder-item ' + (node.id === currentFolderId ? 'active' : '');
+                element.style.paddingLeft = `${0.5 + level * 1.5}rem`;
+                element.dataset.id = node.id;
+                element.innerHTML = `<i class="ph ph-folder mr-2"></i><span class="truncate flex-grow">${node.name}</span>`;
+                element.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    currentFolderId = node.id;
+                    activeTagFilters.clear();
+                    renderAll();
+                });
+                return element;
+            }
+
+            function renderGallery() {
+                const { item: currentFolder } = findItemAndParent(currentFolderId);
+                if (!currentFolder) return;
+
+                galleryGrid.innerHTML = '';
+                const searchTerm = searchInput.value.toLowerCase();
+                const showHidden = showHiddenToggle.checked;
+
+                let itemsToShow = currentFolder.children.filter(item => {
+                    if (!showHidden && item.visibility === 'hidden') return false;
+                    const matchesTag = activeTagFilters.size === 0 || (item.type === 'image' && item.tags && Array.from(activeTagFilters).every(t => item.tags.includes(t)));
+                    const matchesSearch = (() => {
+                        if (!searchTerm) return true;
+                        if (item.type === 'folder') return item.name.toLowerCase().includes(searchTerm);
+                        const { model } = findModelAndVersion(item.meta.modelVersionId);
+                        return item.meta.prompt.toLowerCase().includes(searchTerm) ||
+                               (model && model.name.toLowerCase().includes(searchTerm)) ||
+                               item.tags.some(tag => tag.toLowerCase().includes(searchTerm));
+                    })();
+                    return matchesTag && matchesSearch;
+                });
+
+                if (itemsToShow.length === 0) {
+                    galleryGrid.appendChild(placeholderCard);
+                    placeholderCard.classList.remove('hidden');
+                } else {
+                    placeholderCard.classList.add('hidden');
+                    itemsToShow.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = 'relative group cursor-pointer rounded-lg overflow-hidden aspect-square';
+                        if (item.type === 'folder') {
+                            card.innerHTML = `<div class="bg-gray-800 w-full h-full flex flex-col items-center justify-center transition-colors group-hover:bg-indigo-800"><i class="ph-bold ph-folder-simple text-6xl text-indigo-400"></i><p class="mt-2 text-white font-semibold truncate">${item.name}</p></div>`;
+                            card.addEventListener('click', () => { currentFolderId = item.id; activeTagFilters.clear(); renderAll(); });
+                        } else {
+                            const { model } = findModelAndVersion(item.meta.modelVersionId);
+                            const reactionsHTML = item.reactions ? `
+                                <div class="absolute bottom-2 left-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    ${Object.entries(item.reactions).map(([reaction, count]) => `
+                                        <div class="flex items-center gap-1 text-white text-xs bg-black/50 rounded-full px-2 py-0.5">
+                                            <span>${reaction === 'like' ? '👍' : reaction === 'love' ? '❤️' : reaction === 'laugh' ? '😂' : '😢'}</span>
+                                            <span>${formatNumber(count)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : '';
+
+                            card.innerHTML = `
+                                <img src="${item.imageUrl}" alt="Gallery image" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-300 flex flex-col justify-end p-4">
+                                    ${item.visibility === 'hidden' ? '<i class="ph ph-eye-slash absolute top-3 right-3 text-white text-lg opacity-70"></i>' : ''}
+                                    <p class="text-white font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-300 truncate">${item.meta.prompt}</p>
+                                    <span class="text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300">${model ? model.name : 'Unknown Model'}</span>
+                                    ${reactionsHTML}
+                                </div>`;
+                            card.addEventListener('click', () => showDetailsModal(item.id));
+                        }
+                        galleryGrid.appendChild(card);
+                    });
+                }
+            }
+
+            function renderTagFilters() {
+                const { item: currentFolder } = findItemAndParent(currentFolderId);
+                if (!currentFolder) return;
+                const allTags = new Set(currentFolder.children.flatMap(item => (item.type === 'image' && item.tags) ? item.tags : []));
+                tagFilterContainer.innerHTML = '';
+                if (allTags.size === 0) {
+                    tagFilterContainer.classList.add('hidden'); return;
+                }
+                tagFilterContainer.classList.remove('hidden');
+                
+                const allBtn = document.createElement('button');
+                allBtn.textContent = 'All';
+                allBtn.className = 'tag-filter-btn ' + (activeTagFilters.size === 0 ? 'active' : '');
+                allBtn.addEventListener('click', () => { activeTagFilters.clear(); renderTagFilters(); renderGallery(); });
+                tagFilterContainer.appendChild(allBtn);
+
+                Array.from(allTags).sort().forEach(tag => {
+                    const tagBtn = document.createElement('button');
+                    tagBtn.textContent = tag;
+                    tagBtn.className = 'tag-filter-btn ' + (activeTagFilters.has(tag) ? 'active' : '');
+                    tagBtn.addEventListener('click', () => { 
+                        if (activeTagFilters.has(tag)) {
+                            activeTagFilters.delete(tag);
+                        } else {
+                            activeTagFilters.add(tag);
+                        }
+                        renderTagFilters(); 
+                        renderGallery(); 
+                    });
+                    tagFilterContainer.appendChild(tagBtn);
+                });
+            }
+
+            function renderBreadcrumbs() {
+                breadcrumbs.innerHTML = '';
+                let path = [];
+                let currentId = currentFolderId;
+                while (currentId) {
+                    const { item, parent } = findItemAndParent(currentId);
+                    if (!item) break;
+                    path.unshift({ id: item.id, name: item.name });
+                    currentId = parent ? parent.id : null;
+                }
+                path.forEach((crumb, index) => {
+                    if (index > 0) breadcrumbs.innerHTML += '<span class="mx-2">/</span>';
+                    const link = document.createElement('span');
+                    link.textContent = crumb.name;
+                    if (index < path.length - 1) {
+                        link.className = 'cursor-pointer hover:text-indigo-400';
+                        link.addEventListener('click', () => { currentFolderId = crumb.id; activeTagFilters.clear(); renderAll(); });
+                    }
+                    breadcrumbs.appendChild(link);
+                });
+            }
+
+            function renderAll() {
+                folderBrowser.innerHTML = '';
+                const tree = renderFolderBrowser(fileSystem);
+                folderBrowser.appendChild(tree);
+                function renderChildren(parentNode, parentElement, level) {
+                    if (parentNode.children) {
+                        parentNode.children.filter(c => c.type === 'folder').forEach(childNode => {
+                            const childElement = renderFolderBrowser(childNode, level + 1);
+                            parentElement.appendChild(childElement);
+                            renderChildren(childNode, parentElement, level + 1);
+                        });
+                    }
+                }
+                renderChildren(fileSystem, folderBrowser, 0);
+                renderTagFilters();
+                renderGallery();
+                renderBreadcrumbs();
+            }
+
+            // --- MODAL FUNCTIONS ---
+            function showDetailsModal(itemId) {
+                const { item } = findItemAndParent(itemId);
+                if (!item) return;
+                const { model, version } = findModelAndVersion(item.meta.modelVersionId);
+                const hiresInfo = item.meta.hires ? `
+                    <dt>Hires Upscale:</dt><dd>${item.meta.hires.upscale}</dd>
+                    <dt>Hires Upscaler:</dt><dd>${item.meta.hires.upscaler}</dd>
+                    <dt>Denoising:</dt><dd>${item.meta.hires.denoising}</dd>
+                ` : '';
+
+                const modalHTML = `
+                    <div class="modal-overlay" id="details-modal-overlay">
+                        <div class="modal-content max-w-5xl">
+                            <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition z-10"><i class="ph-bold ph-x text-2xl"></i></button>
+                            <div class="p-6">
+                                <div class="flex flex-col lg:flex-row gap-6">
+                                    <div class="lg:w-2/5"><img src="${item.imageUrl}" alt="Detailed view" class="rounded-lg w-full h-auto object-cover"></div>
+                                    <div class="lg:w-3/5 space-y-3">
+                                        <div><h3 class="font-semibold text-gray-300 mb-1">Positive Prompt</h3><p class="text-sm bg-gray-900 p-3 rounded-md max-h-40 overflow-y-auto">${item.meta.prompt}</p></div>
+                                        <div><h3 class="font-semibold text-gray-300 mb-1">Negative Prompt</h3><p class="text-sm bg-gray-900 p-3 rounded-md max-h-24 overflow-y-auto">${item.meta.negativePrompt}</p></div>
+                                        <details class="text-sm">
+                                            <summary class="cursor-pointer font-semibold text-gray-300">Generation Data</summary>
+                                            <div class="metadata-grid text-sm mt-2">
+                                                <dt>Model:</dt><dd>${model ? `<a href="${model.url}" target="_blank" class="hover:underline">${model.name} <span class="tag-sm">${version.name}</span> <i class="ph ph-arrow-square-out"></i></a>` : 'Unknown'}</dd>
+                                                <dt>Base Model:</dt><dd>${version ? version.baseModel : 'N/A'}</dd>
+                                                <dt>Creator:</dt><dd>${item.creator || 'N/A'}</dd>
+                                                <dt>Source:</dt><dd><a href="${item.sourceUrl}" target="_blank" class="hover:underline">Link <i class="ph ph-arrow-square-out"></i></a></dd>
+                                                <dt>Sampler:</dt><dd>${item.meta.sampler}</dd>
+                                                <dt>Steps:</dt><dd>${item.meta.steps}</dd>
+                                                <dt>CFG Scale:</dt><dd>${item.meta.cfgScale}</dd>
+                                                <dt>Seed:</dt><dd>${item.meta.seed}</dd>
+                                                ${hiresInfo}
+                                            </div>
+                                        </details>
+                                        <div><h3 class="font-semibold text-gray-300 mb-1">Tags</h3><div class="flex flex-wrap gap-2">${item.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div></div>
+                                        <div class="flex items-center justify-between pt-4 border-t border-gray-700">
+                                            <div class="flex items-center gap-2">
+                                                <label for="modal-visibility">Visibility:</label>
+                                                <select id="modal-visibility" data-id="${item.id}" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-sm">
+                                                    <option value="public" ${item.visibility === 'public' ? 'selected' : ''}>Public</option>
+                                                    <option value="hidden" ${item.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
+                                                </select>
+                                            </div>
+                                            <button id="delete-btn" data-id="${item.id}" class="bg-red-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-red-700 transition flex items-center justify-center space-x-2"><i class="ph ph-trash"></i><span>Delete</span></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                modalContainer.innerHTML = modalHTML;
+                document.getElementById('close-modal-btn').addEventListener('click', hideModal);
+                document.getElementById('details-modal-overlay').addEventListener('click', (e) => e.target === e.currentTarget && hideModal());
+                document.getElementById('delete-btn').addEventListener('click', handleDelete);
+                document.getElementById('modal-visibility').addEventListener('change', handleVisibilityChange);
+            }
+            
+            function showAddImageModal() {
+                const modelOptions = models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+                const modalHTML = `
+                    <div class="modal-overlay" id="add-image-modal-overlay">
+                        <form id="add-image-form" class="modal-content max-w-5xl">
+                            <button id="close-modal-btn" type="button" class="absolute top-4 right-4 text-gray-400 hover:text-white transition z-10"><i class="ph-bold ph-x text-2xl"></i></button>
+                            <div class="p-6 space-y-4">
+                                <h2 class="text-xl font-bold">Add New Image to '${findItemAndParent(currentFolderId).item.name}'</h2>
+                                <div class="flex flex-col md:flex-row gap-6">
+                                    <div class="md:w-1/3 space-y-4">
+                                        <img id="image-preview" src="https://placehold.co/400x400/1f2937/4b5563?text=Preview" class="rounded-lg w-full aspect-square object-cover bg-gray-900">
+                                        <div><label class="text-sm font-medium">Image URL</label><input type="url" id="image-url-input" class="form-input mt-1" placeholder="https://..."></div>
+                                        <div><label class="text-sm font-medium">Or Upload File (Metadata extracted if available)</label><input type="file" id="image-file-input" accept="image/*" class="form-input mt-1 file:mr-4 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200"></div>
+                                    </div>
+                                    <div class="md:w-2/3 space-y-3">
+                                        <div><label class="text-sm font-medium">Positive Prompt</label><textarea id="prompt-input" rows="4" class="form-input mt-1"></textarea></div>
+                                        <div><label class="text-sm font-medium">Negative Prompt</label><textarea id="neg-prompt-input" rows="2" class="form-input mt-1"></textarea></div>
+                                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            <div><label class="text-sm font-medium">Steps</label><input id="steps-input" type="number" class="form-input mt-1" value="30"></div>
+                                            <div><label class="text-sm font-medium">CFG Scale</label><input id="cfg-input" type="number" step="0.1" class="form-input mt-1" value="7"></div>
+                                            <div class="col-span-2"><label class="text-sm font-medium">Sampler</label><input id="sampler-input" type="text" class="form-input mt-1" value="DPM++ 2M Karras"></div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div><label class="text-sm font-medium">Seed</label><input id="seed-input" type="text" class="form-input mt-1"></div>
+                                            <div><label class="text-sm font-medium">Size</label><input id="size-input" type="text" class="form-input mt-1" placeholder="e.g., 896x1152"></div>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div><label class="text-sm font-medium">Hires Upscale</label><input id="hires-upscale-input" type="number" step="0.1" class="form-input mt-1"></div>
+                                            <div><label class="text-sm font-medium">Hires Denoising</label><input id="hires-denoising-input" type="number" step="0.01" class="form-input mt-1"></div>
+                                            <div><label class="text-sm font-medium">Hires Upscaler</label><input id="hires-upscaler-input" type="text" class="form-input mt-1"></div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div><label class="text-sm font-medium">Model</label><select id="model-select" class="form-input mt-1">${modelOptions}</select></div>
+                                            <div><label class="text-sm font-medium">Version</label><select id="model-version-select" class="form-input mt-1"></select></div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div><label class="text-sm font-medium">Creator</label><input id="creator-input" type="text" class="form-input mt-1"></div>
+                                            <div><label class="text-sm font-medium">Source URL</label><input id="source-url-input" type="url" class="form-input mt-1"></div>
+                                        </div>
+                                        <div><label class="text-sm font-medium">Tags (comma-separated)</label><input id="tags-input" type="text" class="form-input mt-1"></div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end items-center gap-4 pt-4 border-t border-gray-700">
+                                    <label>Visibility: <select id="visibility-select" class="form-input inline-block w-auto"><option value="public">Public</option><option value="hidden">Hidden</option></select></label>
+                                    <button type="submit" class="bg-green-600 text-white font-semibold rounded-lg px-6 py-2 hover:bg-green-700 transition">Save Image</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>`;
+                modalContainer.innerHTML = modalHTML;
+                document.getElementById('close-modal-btn').addEventListener('click', hideModal);
+                document.getElementById('add-image-modal-overlay').addEventListener('click', (e) => e.target === e.currentTarget && hideModal());
+                document.getElementById('add-image-form').addEventListener('submit', handleSaveImage);
+                document.getElementById('image-file-input').addEventListener('change', handleFileChange);
+                const modelSelect = document.getElementById('model-select');
+                modelSelect.addEventListener('change', populateVersionSelect);
+                populateVersionSelect({ target: modelSelect });
+            }
+
+            function populateVersionSelect(event) {
+                const modelId = event.target.value;
+                const model = models.find(m => m.id === modelId);
+                const versionSelect = document.getElementById('model-version-select');
+                versionSelect.innerHTML = '';
+                if (model) {
+                    model.versions.forEach(v => {
+                        const option = document.createElement('option');
+                        option.value = v.id;
+                        option.textContent = v.name;
+                        versionSelect.appendChild(option);
+                    });
+                }
+            }
+            
+            function showModelManager() {
+                modelManagerView.style.display = 'block';
+                modelManagerView.innerHTML = `
+                    <div class="flex h-full">
+                        <!-- Left Panel: Model List -->
+                        <div class="w-1/4 border-r border-gray-700 flex flex-col bg-gray-900">
+                            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                                <h2 class="text-xl font-bold">Models</h2>
+                                <button id="close-model-manager-btn" class="text-gray-400 hover:text-white"><i class="ph-bold ph-x text-2xl"></i></button>
+                            </div>
+                            <div id="model-list" class="flex-grow overflow-y-auto p-2">
+                                ${models.map(m => `<div class="p-3 rounded-lg cursor-pointer hover:bg-gray-700" data-model-id="${m.id}">${m.name} <span class="text-xs text-gray-400">(${m.type})</span></div>`).join('')}
+                            </div>
+                            <div class="p-2 border-t border-gray-700">
+                                <button id="show-add-model-view-btn" class="w-full bg-indigo-600 text-white font-semibold rounded-lg px-4 py-2 hover:bg-indigo-700 transition">Add New Model</button>
+                            </div>
+                        </div>
+                        <!-- Middle Panel: Model Card -->
+                        <div id="model-card-view" class="w-1/2 border-r border-gray-700 flex-grow overflow-y-auto p-6">
+                            <div class="text-center text-gray-500 h-full flex items-center justify-center">Select a model to view its details.</div>
+                        </div>
+                        <!-- Right Panel: Version Details -->
+                        <div id="model-version-view" class="w-1/4 flex-grow overflow-y-auto p-6 bg-gray-900">
+                             <div class="text-center text-gray-500 h-full flex items-center justify-center">Select a version to see details.</div>
+                        </div>
+                    </div>`;
+                
+                document.getElementById('close-model-manager-btn').addEventListener('click', () => modelManagerView.style.display = 'none');
+                document.getElementById('model-list').addEventListener('click', (e) => {
+                    const modelItem = e.target.closest('[data-model-id]');
+                    if (modelItem) {
+                        renderModelCard(modelItem.dataset.modelId);
+                        document.getElementById('model-version-view').innerHTML = `<div class="text-center text-gray-500 h-full flex items-center justify-center">Select a version to see details.</div>`;
+                    }
+                });
+                document.getElementById('show-add-model-view-btn').addEventListener('click', () => renderModelCard(null));
+            }
+
+            function renderModelCard(modelId) {
+                const cardView = document.getElementById('model-card-view');
+                const model = models.find(m => m.id === modelId);
+                
+                let contentHTML;
+                if (model) { // View existing model
+                    const creator = creators.find(c => c.id === model.creatorId);
+                    const galleryImagesHTML = (model.galleryImageIds || [])
+                        .map(id => findItemAndParent(id)?.item?.imageUrl)
+                        .filter(Boolean)
+                        .map(url => `<img src="${url}" class="w-24 h-24 object-cover rounded cursor-pointer" data-preview-url="${url}">`)
+                        .join('');
+
+                    contentHTML = `
+                        <div class="flex items-start gap-4 mb-4">
+                            <img src="${creator?.profileImageUrl || 'https://placehold.co/100x100/374151/ffffff?text=C'}" class="w-24 h-24 rounded-full">
+                            <div>
+                                <h3 class="text-2xl font-bold">${model.name}</h3>
+                                <p class="text-gray-400">by <a href="${creator?.url}" target="_blank" class="text-indigo-400 hover:underline">${creator?.name || 'Unknown'}</a></p>
+                                <div class="flex flex-wrap gap-2 mt-2">${model.tags.map(t => `<span class="tag-sm">${t}</span>`).join('')}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold mt-4">About this model</h4>
+                            <p class="text-sm text-gray-300 mt-1">${model.description || 'No description available.'}</p>
+                        </div>
+                         <div>
+                            <h4 class="font-semibold mt-4">Gallery</h4>
+                            <div id="model-gallery" class="flex flex-wrap gap-2 mt-2 p-2 bg-gray-900 rounded">${galleryImagesHTML || '<span class="text-xs text-gray-500">No gallery images.</span>'}</div>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold mt-6">Versions</h4>
+                            <div id="model-versions-list" class="space-y-2 mt-2">
+                                ${model.versions.map(v => `<div class="p-3 rounded-lg cursor-pointer hover:bg-gray-700 border border-gray-700" data-version-id="${v.id}">
+                                    <div class="font-semibold">${v.name}</div>
+                                    <div class="text-xs text-gray-400">${v.baseModel} &bull; ${v.publishedDate}</div>
+                                </div>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else { // Add new model form
+                    const creatorOptions = creators.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                    contentHTML = `
+                        <h3 class="text-2xl font-bold mb-4">Add New Model</h3>
+                        <form id="add-model-form">
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="text-sm font-medium">Model Name</label><input name="name" type="text" class="form-input mt-1" required></div>
+                                    <div><label class="text-sm font-medium">Model Type</label><select name="type" class="form-input mt-1">${MODEL_TYPES.map(t => `<option>${t}</option>`).join('')}</select></div>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium">Creator</label>
+                                    <div class="flex gap-2 mt-1">
+                                        <select name="creatorId" class="form-input flex-grow">${creatorOptions}<option value="new">-- Add New Creator --</option></select>
+                                    </div>
+                                </div>
+                                <div id="new-creator-fields" class="hidden space-y-2 p-3 bg-gray-900 rounded-md">
+                                     <div><label class="text-sm font-medium">New Creator Name</label><input name="newCreatorName" type="text" class="form-input mt-1"></div>
+                                     <div><label class="text-sm font-medium">Creator URL</label><input name="newCreatorUrl" type="url" class="form-input mt-1"></div>
+                                     <div><label class="text-sm font-medium">Creator Notes</label><textarea name="newCreatorNotes" rows="2" class="form-input mt-1"></textarea></div>
+                                </div>
+                                <div><label class="text-sm font-medium">Model URL</label><input name="url" type="url" class="form-input mt-1"></div>
+                                <div><label class="text-sm font-medium">Description</label><textarea name="description" rows="3" class="form-input mt-1"></textarea></div>
+                                <div><label class="text-sm font-medium">Model Tags (comma-separated)</label><input name="tags" type="text" class="form-input mt-1"></div>
+                                <div class="flex justify-end pt-4 border-t border-gray-700">
+                                    <button type="submit" class="bg-green-600 text-white font-semibold rounded-lg px-6 py-2 hover:bg-green-700 transition">Save and Add Version</button>
+                                </div>
+                            </div>
+                        </form>
+                    `;
+                }
+                cardView.innerHTML = contentHTML;
+                
+                document.getElementById('model-versions-list')?.addEventListener('click', (e) => {
+                    const versionItem = e.target.closest('[data-version-id]');
+                    if(versionItem) renderVersionDetails(model.id, versionItem.dataset.versionId);
+                });
+
+                document.getElementById('model-gallery')?.addEventListener('click', (e) => {
+                    const galleryImg = e.target.closest('[data-preview-url]');
+                    if (galleryImg) showImagePreviewModal(galleryImg.dataset.previewUrl);
+                });
+
+                const addModelForm = document.getElementById('add-model-form');
+                if (addModelForm) {
+                    addModelForm.addEventListener('submit', handleSaveNewModel);
+                    const creatorSelect = addModelForm.querySelector('[name="creatorId"]');
+                    creatorSelect.addEventListener('change', (e) => {
+                        document.getElementById('new-creator-fields').style.display = e.target.value === 'new' ? 'block' : 'none';
+                    });
+                }
+            }
+
+            function renderVersionDetails(modelId, versionId) {
+                const versionView = document.getElementById('model-version-view');
+                const model = models.find(m => m.id === modelId);
+                const version = model?.versions.find(v => v.id === versionId);
+
+                if (!version) {
+                    versionView.innerHTML = `<div class="text-center text-gray-500">Version not found.</div>`;
+                    return;
+                }
+                
+                const hashesHTML = Object.entries(version.hashes).map(([key, value]) => `
+                    <div class="grid grid-cols-3 items-center gap-2">
+                        <span class="text-xs font-semibold text-gray-400">${key}</span>
+                        <input type="text" class="form-input col-span-2 text-xs font-mono" value="${value}" readonly>
+                    </div>`).join('');
+
+                const downloadsHTML = (version.downloadLinks || []).map(link => `
+                    <a href="${link.url}" target="_blank" class="flex items-center gap-2 text-indigo-400 hover:underline text-sm">
+                        <i class="ph ph-download-simple"></i> ${link.name}
+                    </a>`).join('');
+
+                versionView.innerHTML = `
+                    <h4 class="text-xl font-bold">${version.name}</h4>
+                    <p class="text-sm text-gray-400 mb-4">${version.baseModel} &bull; Published: ${version.publishedDate}</p>
+                    <div class="space-y-4">
+                        <div>
+                            <h5 class="font-semibold text-sm mb-1">Description</h5>
+                            <p class="text-xs text-gray-300">${version.description || 'No version-specific description.'}</p>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-sm mb-1">Trigger Words</h5>
+                            <div class="flex flex-wrap gap-1">${version.trainedWords.length > 0 ? version.trainedWords.map(t => `<span class="tag-sm">${t}</span>`).join('') : '<span class="text-xs text-gray-500">None</span>'}</div>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-sm mb-1">Hashes</h5>
+                            <div class="space-y-1">${hashesHTML}</div>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-sm mb-1">Downloads</h5>
+                            <div class="space-y-1">${downloadsHTML || '<span class="text-xs text-gray-500">No links available.</span>'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function showImagePreviewModal(imageUrl) {
+                const modalHTML = `
+                    <div class="modal-overlay" id="image-preview-modal-overlay">
+                        <div class="modal-content max-w-4xl p-2 relative bg-transparent shadow-none">
+                            <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-200 hover:text-white transition z-10 bg-black bg-opacity-50 rounded-full p-1">
+                                <i class="ph-bold ph-x text-2xl"></i>
+                            </button>
+                            <img src="${imageUrl}" alt="Image Preview" class="rounded-lg w-full h-auto object-contain max-h-[85vh]">
+                        </div>
+                    </div>`;
+                modalContainer.innerHTML = modalHTML;
+                document.getElementById('close-modal-btn').addEventListener('click', hideModal);
+                document.getElementById('image-preview-modal-overlay').addEventListener('click', (e) => e.target === e.currentTarget && hideModal());
+            }
+
+            function hideModal() { modalContainer.innerHTML = ''; }
+
+            // --- EVENT HANDLERS ---
+            function handleSaveImage(e) {
+                e.preventDefault();
+                const { item: parentFolder } = findItemAndParent(currentFolderId);
+                if (!parentFolder || parentFolder.type !== 'folder') return;
+                const newImage = {
+                    id: `item-${nextId++}`, type: 'image', visibility: document.getElementById('visibility-select').value,
+                    imageUrl: document.getElementById('image-preview').src, creator: document.getElementById('creator-input').value.trim(),
+                    sourceUrl: document.getElementById('source-url-input').value.trim(),
+                    meta: {
+                        prompt: document.getElementById('prompt-input').value.trim(),
+                        negativePrompt: document.getElementById('neg-prompt-input').value.trim(),
+                        modelVersionId: document.getElementById('model-version-select').value,
+                        steps: parseInt(document.getElementById('steps-input').value, 10),
+                        sampler: document.getElementById('sampler-input').value.trim(),
+                        cfgScale: parseFloat(document.getElementById('cfg-input').value),
+                        seed: document.getElementById('seed-input').value.trim(),
+                        size: document.getElementById('size-input').value.trim(),
+                        hires: {
+                            upscale: parseFloat(document.getElementById('hires-upscale-input').value),
+                            denoising: parseFloat(document.getElementById('hires-denoising-input').value),
+                            upscaler: document.getElementById('hires-upscaler-input').value.trim(),
+                        }
+                    },
+                    tags: document.getElementById('tags-input').value.split(',').map(t => t.trim()).filter(Boolean),
+                };
+                if (isNaN(newImage.meta.hires.upscale)) delete newImage.meta.hires;
+                parentFolder.children.push(newImage);
+                hideModal();
+                renderAll();
+                showMessage('Image saved successfully!');
+            }
+
+            function handleSaveNewModel(e) {
+                e.preventDefault();
+                const form = e.target;
+                const formData = new FormData(form);
+                let creatorId = formData.get('creatorId');
+
+                if (creatorId === 'new') {
+                    const newCreatorName = formData.get('newCreatorName').trim();
+                    if (!newCreatorName) {
+                        showMessage('Error: New creator must have a name.', 'error');
+                        return;
+                    }
+                    const newCreator = {
+                        id: `c-${nextId++}`,
+                        name: newCreatorName,
+                        url: formData.get('newCreatorUrl').trim(),
+                        about: formData.get('newCreatorNotes').trim(),
+                        profileImageUrl: `https://placehold.co/100x100/6b7280/ffffff?text=${newCreatorName.charAt(0)}`,
+                        stats: { followers: 0, likes: 0, downloads: 0 },
+                        socialLinks: []
+                    };
+                    creators.push(newCreator);
+                    creatorId = newCreator.id;
+                }
+
+                const newModel = {
+                    id: `model-${nextId++}`,
+                    name: formData.get('name').trim(),
+                    type: formData.get('type'),
+                    creatorId: creatorId,
+                    url: formData.get('url').trim(),
+                    description: formData.get('description').trim(),
+                    tags: formData.get('tags').split(',').map(t => t.trim()).filter(Boolean),
+                    galleryImageIds: [],
+                    versions: []
+                };
+
+                if (!newModel.name) {
+                    showMessage('Error: Model Name is required.', 'error');
+                    return;
+                }
+                
+                models.push(newModel);
+                showMessage('Model created successfully. Now add a version.');
+
+                const modelList = document.getElementById('model-list');
+                modelList.innerHTML = models.map(m => `<div class="p-3 rounded-lg cursor-pointer hover:bg-gray-700" data-model-id="${m.id}">${m.name} <span class="text-xs text-gray-400">(${m.type})</span></div>`).join('');
+
+                renderModelCard(newModel.id);
+            }
+            
+            function handleFileChange(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.getElementById('image-preview').src = event.target.result;
+                    document.getElementById('image-url-input').value = '';
+                };
+                reader.readAsDataURL(file);
+
+                const metaReader = new FileReader();
+                metaReader.onload = (event) => {
+                    try {
+                        const buffer = event.target.result;
+                        const metadata = extractPngParameters(buffer);
+                        if (metadata) {
+                            parseAndFillGenerationData(metadata);
+                            showMessage("PNG metadata extracted and pre-filled!");
+                        } else if (file.type === 'image/png') {
+                            showMessage("No generation metadata found in this PNG.", "error");
+                        }
+                    } catch (error) {
+                        console.error("Error reading image metadata:", error);
+                    }
+                };
+                metaReader.readAsArrayBuffer(file);
+            }
+
+            function extractPngParameters(arrayBuffer) {
+                const dataView = new DataView(arrayBuffer);
+                if (dataView.byteLength < 8 || dataView.getUint32(0) !== 0x89504E47 || dataView.getUint32(4) !== 0x0D0A1A0A) return null;
+                let offset = 8;
+                while (offset < dataView.byteLength) {
+                    const length = dataView.getUint32(offset);
+                    const type = String.fromCharCode.apply(null, new Uint8Array(arrayBuffer, offset + 4, 4));
+                    if (type === 'tEXt' || type === 'iTXt') {
+                        const chunkData = new Uint8Array(arrayBuffer, offset + 8, length);
+                        const separatorIndex = chunkData.indexOf(0);
+                        if (separatorIndex > 0) {
+                            const keyword = new TextDecoder("utf-8").decode(chunkData.slice(0, separatorIndex));
+                            if (keyword === 'parameters') {
+                                return new TextDecoder("utf-8").decode(chunkData.slice(separatorIndex + 1));
+                            }
+                        }
+                    }
+                    if (type === 'IEND') break;
+                    offset += 12 + length;
+                }
+                return null;
+            }
+
+            function parseAndFillGenerationData(text) {
+                const lines = text.split('\n');
+                let prompt = '', negPrompt = '', parameters = '';
+                let currentSection = 'prompt';
+                for (const line of lines) {
+                    if (line.startsWith('Negative prompt:')) {
+                        currentSection = 'neg_prompt';
+                        negPrompt = line.substring('Negative prompt:'.length).trim();
+                    } else if (line.startsWith('Steps:')) {
+                        currentSection = 'params';
+                        parameters = line;
+                    } else {
+                        if (currentSection === 'prompt') prompt += (prompt ? '\n' : '') + line;
+                        else if (currentSection === 'neg_prompt') negPrompt += (negPrompt ? '\n' : '') + line;
+                    }
+                }
+                document.getElementById('prompt-input').value = prompt;
+                document.getElementById('neg-prompt-input').value = negPrompt;
+                const params = {};
+                parameters.split(', ').forEach(part => {
+                    const [key, ...valueParts] = part.split(':');
+                    if (key && valueParts.length > 0) params[key.trim()] = valueParts.join(':').trim();
+                });
+                if (params['Steps']) document.getElementById('steps-input').value = params['Steps'];
+                if (params['CFG scale']) document.getElementById('cfg-input').value = params['CFG scale'];
+                if (params['Sampler']) document.getElementById('sampler-input').value = params['Sampler'];
+                if (params['Seed']) document.getElementById('seed-input').value = params['Seed'];
+                if (params['Size']) document.getElementById('size-input').value = params['Size'];
+                if (params['Hires upscale']) document.getElementById('hires-upscale-input').value = params['Hires upscale'];
+                if (params['Hires upscaler']) document.getElementById('hires-upscaler-input').value = params['Hires upscaler'];
+                if (params['Denoising strength']) document.getElementById('hires-denoising-input').value = params['Denoising strength'];
+                if (params['Model']) {
+                    const modelName = params['Model'];
+                    const modelSelect = document.getElementById('model-select');
+                    const foundModel = Array.from(modelSelect.options).find(opt => modelName.toLowerCase().includes(opt.text.toLowerCase()));
+                    if (foundModel) {
+                        modelSelect.value = foundModel.value;
+                        populateVersionSelect({ target: modelSelect });
+                    }
+                }
+            }
+
+            function handleDelete(e) {
+                const idToDelete = e.currentTarget.dataset.id;
+                const { parent } = findItemAndParent(idToDelete);
+                if (parent) {
+                    parent.children = parent.children.filter(i => i.id !== idToDelete);
+                    hideModal();
+                    renderAll();
+                    showMessage('Item deleted.');
+                }
+            }
+            
+            function handleVisibilityChange(e) {
+                const idToChange = e.currentTarget.dataset.id;
+                const { item } = findItemAndParent(idToChange);
+                if (item) { item.visibility = e.currentTarget.value; renderAll(); }
+            }
+            
+            addFolderBtn.addEventListener('click', () => {
+                const folderName = newFolderNameInput.value.trim();
+                if (folderName) {
+                    const { item: parentFolder } = findItemAndParent(currentFolderId);
+                    if (parentFolder) {
+                        parentFolder.children.push({ id: `folder-${nextId++}`, type: 'folder', name: folderName, children: [] });
+                        newFolderNameInput.value = '';
+                        renderAll();
+                    }
+                }
+            });
+
+            // --- GLOBAL LISTENERS ---
+            openAddImageModalBtn.addEventListener('click', showAddImageModal);
+            openModelManagerBtn.addEventListener('click', showModelManager);
+            searchInput.addEventListener('input', renderGallery);
+            showHiddenToggle.addEventListener('change', renderGallery);
+            window.addEventListener('keydown', (e) => e.key === 'Escape' && hideModal());
+
+            // --- INITIALIZATION ---
+            initializeMockData();
+            renderAll();
+        });
+    </script>
+</body>
+</html>
